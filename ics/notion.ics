@@ -1,6 +1,7 @@
 BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//Your Name//Your Calendar Name//EN
+PRODID:-//Ezri//Notion//EN
+X-WR-CALNAME:Notion Calendar
 
 # 第一个日历
 BEGIN:VEVENT
