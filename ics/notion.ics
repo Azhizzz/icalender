@@ -3,7 +3,6 @@ VERSION:2.0
 PRODID:-//Ezri//Notion//EN
 X-WR-CALNAME:Notion Calendar
 
-# 第一个日历
 BEGIN:VEVENT
 UID:event1@example.com
 DTSTAMP:20240510T080000Z
@@ -16,7 +15,6 @@ CATEGORIES:Meeting
 COLOR:#FF0000
 END:VEVENT
 
-# 第二个日历
 BEGIN:VEVENT
 UID:event2@example.com
 DTSTAMP:20240511T080000Z
