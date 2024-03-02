@@ -1,35 +1,23 @@
 from datetime import datetime
+from tenacity import retry, stop_after_attempt, wait_fixed
+from scripts.notion_days import NotionCalendar
 
-# 设置日历文件的基本信息
-cal = """BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Your Name//Your Calendar Name//EN
-"""
+# 基于给定的策略设置重试装饰器
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
+def get_calendar_with_retry(calendar):
+    return calendar.get_calendar()
 
-# 创建一个日历事件
-event = """
-BEGIN:VEVENT
-UID:{}@example.com
-DTSTAMP:{}Z
-DTSTART:{}Z
-DTEND:{}Z
-SUMMARY:Your Event Name
-DESCRIPTION:Description of your event
-LOCATION:Location of your event
-END:VEVENT
-""".format(
-    "uid1",  # 唯一标识符
-    datetime.now().strftime("%Y%m%dT%H%M%SZ"),  # 当前时间的时间戳
-    datetime(2024, 3, 1, 9, 0, 0).strftime("%Y%m%dT%H%M%SZ"),  # 事件开始时间
-    datetime(2024, 3, 1, 10, 0, 0).strftime("%Y%m%dT%H%M%SZ")  # 事件结束时间
-)
+def main():
+    # 创建 NotionCalendar 实例
+    calendar = NotionCalendar()
 
-# 结束日历文件
-cal += event  # 将事件添加到日历文件
-cal += "END:VCALENDAR"
+    # 调用带有重试装饰器的 get_calendar_with_retry 方法
+    cal = get_calendar_with_retry(calendar)
 
-# 将内容写入文件
-with open("your_calendar.ics", "w") as f:
-    f.write(cal)
+    # 打印日历事件
+    for event in cal.events:
+        print(f'Event: {event.name}, Start: {event.begin}, End: {event.end}')
 
-print("Calendar file created.")
+# 如果这个脚本是直接运行的，而不是被导入的，那么运行 main 函数
+if __name__ == "__main__":
+    main()

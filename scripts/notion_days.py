@@ -1,102 +1,132 @@
 from notion_client import Client
-from datetime import datetime, timedelta
-import datetime
-import os
-import logging
-import re
+from ics import Calendar, Event
 from datetime import datetime
-TARGET_ICON_URL = "https://www.notion.so/icons/star_gray.svg"
-from utils import (
-    format_date,
-    get_date,
-    get_first_and_last_day_of_month,
-    get_first_and_last_day_of_week,
-    get_first_and_last_day_of_quarter,
-    get_first_and_last_day_of_year,
-    get_icon,
-    get_number,
-    get_relation,
-    get_rich_text,
-    get_title,
-    timestamp_to_date,
-)
+import os
+class NotionCalendar:
 
-
-class NotionManager:
     def __init__(self):
-        self.__cache = {}
-        self.database_name_dict = {
-            "DAY_DATABASE_NAME": "Days",
-            "WEEK_DATABASE_NAME": "Weeks",
-            "MONTH_DATABASE_NAME": "Months",
-            "QUARTER_DATABASE_NAME": "Quarters",
-            "YEAR_DATABASE_NAME": "Years",
-            "TASKS_DATABASE_NAME": "Tasks",
-            "FORM_DATABASE_NAME": "Form",
-            "DAILY_DATABASE_NAME": "Daily",
+        self.client = Client(auth="secret_wtQ22gWbsrLhucFqJMdosKPwONVRnTOBgD1MbmUU6p")
+        self.tasks_database_id = "e853106c709a470da4d7ffb8e6d3ad1a"
+        self.daily_database_id = "249a9ae39eb5456da9bedf4ca74b491e"
+        self.gtd_database_id = "b8802ab7a10347fc80386c782bd422e6"
+
+    def get_calendar(self):
+        color_mapping = {
+            "Tasks": "purple",
+            "Gtd": "skyblue",
+            "Social": "orange",
+            "Sleep": "lightgreen",
+            "Wash": "lightgreen",
+            "Eating": "lightgreen",
+            "Swipe Phone": "darkgreen",
+            "Read": "darkgreen"
         }
-        # self.client = Client(auth=os.getenv("NOTION_TOKEN"), log_level=logging.ERROR)
-        #
-        # # # 从环境变量中获取 URL
-        # tasks_notion_url = os.getenv("TASKS_NOTION_PAGE")
-        # time_notion_url = os.getenv("DAYS_NOTION_PAGE")
-        # self.client = Client(auth=os.getenv("NOTION_TOKEN"), log_level=logging.ERROR)
-        self.client = Client(auth="secret_wtQ22gWbsrLhucFqJMdosKPwONVRnTOBgD1MbmUU6p", log_level=logging.ERROR)
+        if os.path.exists('notion.ics'):
+            with open('notion.ics', 'r') as f:
+                ics_content = f.read()
 
-        # # 从环境变量中获取 URL
-        tasks_notion_url = "https://www.notion.so/ezrilem/Second-Brain-f7990a8b9bd44899ba72b6222e77b427"
-        time_notion_url = "https://www.notion.so/ezrilem/Time-Management-9a535ba80e9c458fa31acd8024bea022"
-        daily_notion_url = "https://www.notion.so/ezrilem/Daily-Records-677412832a534799aff3f822af613c4b"
-        self.__cache = {}
-        self.search_database(self.extract_page_id(time_notion_url))
-        for key in self.database_name_dict.keys():
-            if (os.getenv(key) != None and os.getenv(key) != ""):
-                self.database_name_dict[key] = os.getenv(key)
-        self.day_database_id = self.database_id_dict.get(self.database_name_dict.get("DAY_DATABASE_NAME"))
-        self.week_database_id = self.database_id_dict.get(self.database_name_dict.get("WEEK_DATABASE_NAME"))
-        self.month_database_id = self.database_id_dict.get(self.database_name_dict.get("MONTH_DATABASE_NAME"))
-        self.quarter_database_id = self.database_id_dict.get(self.database_name_dict.get("QUARTER_DATABASE_NAME"))
-        self.year_database_id = self.database_id_dict.get(self.database_name_dict.get("YEAR_DATABASE_NAME"))
-        self.search_database(self.extract_page_id(tasks_notion_url))
-        for key in self.database_name_dict.keys():
-            if (os.getenv(key) != None and os.getenv(key) != ""):
-                self.database_name_dict[key] = os.getenv(key)
-            self.form_database_id = self.database_id_dict.get(self.database_name_dict.get("FORM_DATABASE_NAME"))
-            self.tasks_database_id = self.database_id_dict.get(self.database_name_dict.get("TASKS_DATABASE_NAME"))
-        self.search_database(self.extract_page_id(daily_notion_url))
-        for key in self.database_name_dict.keys():
-            if (os.getenv(key) != None and os.getenv(key) != ""):
-                self.database_name_dict[key] = os.getenv(key)
-        self.daily_database_id = self.database_id_dict.get(self.database_name_dict.get("DAILY_DATABASE_NAME"))
-    database_id_dict = {}
-    image_dict = {}
+        # 创建Calendar对象
+        cal = Calendar()
+        database_ids = [
+            self.daily_database_id,
+            self.gtd_database_id,
+            self.tasks_database_id
+        ]
+        # for database_id in [self.daily_database_id, self.gtd_database_id, self.tasks_database_id]:
+        # 查询数据库并处理事件
+        # 查询所有数据库并处理事件
+        for database_id in database_ids:
+            results = self.client.databases.query(database_id=database_id)
+            for page in results["results"]:
+                print(page)
+                page_data = self.client.pages.retrieve(page_id=page["id"])
+                e = Event()
+                e.name = page["properties"]["Name"]["title"][0]["text"]["content"]
+                # 获取Description属性
+                description = page.get("properties", {}).get("Description", {})
+                if "rich_text" in description and description["rich_text"]:
+                    # 如果rich_text存在且非空，获取第一个元素的plain_text
+                    e.description = description["rich_text"][0].get("plain_text", "")
+                else:
+                    # 如果rich_text不存在或为空，设置描述为空字符串
+                    e.description = ""
+                e.color = color_mapping.get(
+                    page["properties"].get("Type", {}).get("name") if "Type" in page["properties"] else "")
 
-    def extract_page_id(self, notion_url):
-        if not isinstance(notion_url, str):
-            notion_url = str(notion_url)
-        # 正则表达式匹配 32 个字符的 Notion page_id
-        match = re.search(r"([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})", notion_url)
-        if match:
-            return match.group(0)
-        else:
-            raise Exception(f"获取NotionID失败，请检查输入的Url是否正确")
+                # # 获取StartTime属性
+                # start_time_property = page.get("properties", {}).get("StartTime", {})
+                # # 获取EndTime属性
+                # end_time_property = page.get("properties", {}).get("EndTime", {})
+                #
+                # # 设置开始时间
+                # if "date" in start_time_property and "start" in start_time_property["date"]:
+                #     start_time = start_time_property["date"]["start"]
+                #     if start_time:  # 确保start_time不是None
+                #         e.begin = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S.%f%z")
+                #     else:
+                #         e.begin = None
+                #
+                # # 设置结束时间
+                # if "date" in end_time_property:
+                #     if "end" in end_time_property["date"]:
+                #         end_time = end_time_property["date"]["end"]
+                #         if end_time:  # 确保end_time不是None
+                #             e.end = datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%S.%f%z")
+                #         else:
+                #             e.end = None  # 如果end_time是None，设置e.end为None
+                #     elif "start" in end_time_property:
+                #         # 如果只有开始时间，使用开始时间作为结束时间
+                #         e.end = e.begin
+                #     else:
+                #         e.end = None  # 如果没有结束时间，设置e.end为None
+                #
+                # # 如果开始时间和结束时间都为空，跳过添加此事件
+                # if e.begin is None and e.end is None:
+                #     continue
+                # 获取StartTime属性
+                start_time_property = page.get("properties", {}).get("StartTime", {})
+                # 获取EndTime属性
+                end_time_property = page.get("properties", {}).get("EndTime", {})
 
-    def search_database(self, block_id):
-        children = self.client.blocks.children.list(block_id=block_id)["results"]
-        # 遍历子块
-        for child in children:
-            # 检查子块的类型
-            if child["type"] == "child_database":
-                title = child.get('child_database').get('title')
-                # print(f"Processing database: {title}")  # 打印数据库的标题
-                self.database_id_dict[title] = child.get("id")
-                # print(f"Stored ID: {self.database_id_dict[title]} for database: {title}")  # 打印存储的 ID 和对应的数据库标题
-            elif child["type"] == "image":
-                if child.get('image') is not None and child.get('image').get('external') is not None:
-                    self.image_dict["url"] = child.get('image').get('external').get('url')
-                    self.image_dict["id"] = child.get('id')
-            # 如果子块有子块，递归调用函数
-            if "has_children" in child and child["has_children"]:
-                self.search_database(child["id"])
- 
+                # 设置开始时间
+                if "date" in start_time_property and start_time_property["date"]:
+                    start_time = start_time_property["date"].get("start")
+                    if start_time:  # 确保start_time不是None
+                        e.begin = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S.%f%z")
+                    else:
+                        e.begin = None
 
+                # 设置结束时间
+                if "date" in end_time_property and end_time_property["date"]:
+                    end_time = end_time_property["date"].get("end")
+                    if end_time:  # 确保end_time不是None
+                        e.end = datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%S.%f%z")
+                    else:
+                        e.end = None  # 如果end_time是None，设置e.end为None
+                elif "start" in end_time_property and end_time_property["date"]:
+                    # 如果EndTime的date属性中只有start，使用StartTime的值
+                    e.end = e.begin
+
+                # 如果开始时间和结束时间都为空，跳过添加此事件
+                if e.begin is None and e.end is None:
+                    continue
+
+                # Add the event to the calendar
+                for existing_event in cal.events:
+                    if existing_event.uid == e.uid:
+                        # 更新现有事件
+                        existing_event.name = e.name
+                        existing_event.begin = e.begin
+                        existing_event.end = e.end
+                        existing_event.description = e.description
+                        # ... 更新其他属性 ...
+                        break
+                else:
+                    # 添加新事件
+                    cal.events.add(e)
+
+        # Write the calendar to the notion.ics file
+        with open('notion.ics', 'w') as f:
+            f.writelines(cal)
+
+        return cal
